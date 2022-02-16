@@ -4,7 +4,7 @@
 
 // defination of the usb standard type 
 #define STM32_VID 0x0483
-#define STM32_PID 0x572B
+#define STM32_PID 0x5740
 
 #define HIGH_BYTE(x) ((uint8_t )((0xFF00U & (x))>>8))
 #define LOW_BYTE(x) ((uint8_t)(0x00FFU & (x)))  
@@ -12,7 +12,7 @@
 #define ALIGN __attribute__((aligned(4)))
 //////////////////////////////////////////////////////
 ///////////  the maximum packet size for the default pipe 
-#define MAX_SIZE_EP0  ((uint8_t)0x40)
+#define MAX_SIZE_EP0  (64)
 #include <stdint.h>
 // some enum defination here 
 typedef enum _USB_ENDPOINT_TYPEDEF 
@@ -179,6 +179,17 @@ typedef struct  _USB_REQUEST_TYPE
 #define ENDP_TYPE_BULK      0x02
 #define ENDP_TYPE_ISOCH     0x01
 #define ENDP_TYPE_CONTROL   0x00
+
+/////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////   HID specific Request ////////////////////////////////////////
+
+#define HID_GET_REPORT   0x01
+#define HID_GET_IDLE     0x02
+#define HID_GET_PROTOCOL 0x03
+#define HID_SET_REPORT   0x09
+#define HID_SET_IDLE     0x0A
+#define HID_SET_PROTOCOL 0x0B
+
 //////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////       Descriptor defination starts here //////////////////
 //////////////////////////////////////////////////////////////////////////////////////

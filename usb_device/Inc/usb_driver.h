@@ -113,10 +113,10 @@ typedef enum _OUT_ENDPOINT_
 //////////   Weak function defination here that user want to implement in the main.c
 /////////////////////////////////////////////////////////////////////////////////////////
 // initialize the usb pinout for the MCU and enable the irq for the usb
- void  USB_Msp_init();
+ void  USB_Msp_init(void);
 
 // deinitialize the usb pins 
- void  USB_Msp_deinit();
+ void  USB_Msp_deinit(void);
 
 
 ////////////////////////////////////////////////////////////////////////////////////
@@ -124,19 +124,21 @@ typedef enum _OUT_ENDPOINT_
 
  void  setup_data_recv_callback(endp_no endpoint_num , uint16_t size);
 
- void  usb_reset_recv_callback(void);
-
  void global_out_nak_callback();
  
+ void usb_reset_recv_callback(void);
+  
  void out_data_recv_callback(uint8_t , uint16_t );
-
- void out_Xfer_cmpt_callbcak(uint8_t );
 
  void setup_stage_cmpt_callback(uint8_t );
 
- void  IN_endpoint_callback(endp_no num , in_endp_int int_val);
+void out_Xfer_cmpt_callbcak(uint8_t );
 
- void  OUT_endpoint_callback(endp_no num ,out_endp_int int_val);
+//// in these two interrupt we have to enable the endpoint0 to recieve out data , 1packet and 1 request 
+
+ void IN_endpoint_callback(endp_no num , in_endp_int int_val);
+
+ void OUT_endpoint_callback(endp_no num ,out_endp_int int_val);
 
  void error_handler(usb_status usb_Status);
 ////////////////////////////////////////////////////////////////////////////
@@ -145,29 +147,35 @@ typedef enum _OUT_ENDPOINT_
 
 
 // reset the usb engine to its default address 
-usb_status reset_handler();
+void reset_handler();
+
+// to activate the  wakeup signal on the usb host 
+void actv_remote_signal(void);
+
+// to deactivate the remote wakeup signal on the usb 
+void deacv_remote_signal(void);
 
 // interrupt handler for the USB core
 void gintsts_handler();  // call this function inside the nvic handler for the USB 
 //////////////////////////////////////////////////////////////////////////////////
 ////// used to activate and deactivate the endpoint in different configuration and interface 
-usb_status ActivateEP(endp_no , eptype);
+void ActivateEP(uint8_t , eptype);
 //////////////////////////////////////////////////////////////////////////////////
 ///// used to deactivate the endpoint in certain interfaces and configuration
-usb_status DeactivateEP(endp_no , eptype);
+void DeactivateEP(uint8_t , eptype);
 //////////////////////////////////////////////////////////////////////////////////
-usb_status setstall(endp_no , eptype  );
+void setstall(endp_no , eptype  );
 /////////////////////////////////////////////////////////////////////////////////////////////
-usb_status clearstall(endp_no , eptype );
+void clearstall(endp_no , eptype );
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 // configuring the endpoint 0 
 void configure_endpoint0(endp_size  size);
 
 // configures the in endpoint for the device 
-void configure_in_endpoint(endp_no endpoint_number, endpoint_typedef usb_endpoint_type, uint16_t endpoint_size);
+void configure_in_endpoint(uint8_t endpoint_number, endpoint_typedef usb_endpoint_type, uint16_t endpoint_size);
 
 // configure the out endpoint for the device
-void configure_out_endpoint(endp_no endpoint_num, endpoint_typedef usb_endpoint_type , uint16_t endpoint_size);
+void configure_out_endpoint(uint8_t endpoint_num, endpoint_typedef usb_endpoint_type , uint16_t endpoint_size);
 
 // deconfigure the in endpoint 
 void deconfigure_in_endpoint(endp_no endpoint_number);
@@ -180,7 +188,7 @@ void deconfigure_out_endpoint(endp_no endpoint_number);
 typedef struct _USB_DRIVER
 {   
     //init the core 
-    usb_status (*initialize_core)(void);
+    void (*initialize_core)(void);
     // Msp init 
     void (* USB_Msp_init)(void);
     // Msp deinit
@@ -197,14 +205,12 @@ typedef struct _USB_DRIVER
     void (* deconfigure_in_endpoint)(endp_no endpoint_number);
     //deconfigure the out endpoint
     void (* deconfigure_out_endpoint)(endp_no endpoint_number); 
-    // flush the tx fifo 
-    usb_status (* flush_txfifo)(endp_no num);
-    // flush the rx fifo 
-    usb_status (* flush_rxfifo)(void);
+    // to enable the endpoint 0 for request and data reception
+    void (* enableep0 )(uint16_t );
     // read the incoming packet 
     void (*read_packet)(uint8_t *, uint16_t );
     // write the packet 
-    void (* write_packet)(endp_no num, uint8_t const *buffer , uint16_t size);
+    void (* write_packet)(uint8_t num,  const void *buffer , uint16_t size);
     // set the device address 
     void (* set_deviceaddr)(uint8_t addr);
 }USBdriver;
