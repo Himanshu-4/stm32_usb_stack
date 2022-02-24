@@ -1,6 +1,8 @@
 #include "usb_framework.h"
 #include <stdlib.h>
 
+uint8_t ep_1 = unlock;
+
 uint8_t *outbuff;
 uint16_t outsize;
 
@@ -31,12 +33,7 @@ void usbd_init()
 ////////////////////////////////////////////////////////////////////////////////////////
 ////////////////     static function start here /////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////
-static void send_mouse_report()
-{
-    HID_report mouse_report = {.x = 5, .y = 0, .buttons = 0};
 
-    usb_driver.write_packet(1, &mouse_report, sizeof(mouse_report));
-}
 ///////////////////////////////////////////////////////////////////////////
 /*********
  *@name sendZLP
@@ -390,6 +387,18 @@ static void process_request()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+///////////////////////////////////////// /////////////////////////////////////////////////////////////////////////
+/////
+void usb_send_report(uint8_t *ptr, uint16_t size)
+{
+    if (ep_1 == lock)return;
+    else ep_1  = lock;
+    // send the report via the endpoint
+    usb_driver.write_packet(1, ptr, size);
+    // activate the USB to send report
+    actv_remote_signal();
+}
+
 ////////////   defination of callback function from the driver layer ///////////////////////////
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -525,18 +534,6 @@ void IN_endpoint_callback(endp_no num, in_endp_int int_val)
             {
             }
 
-            if (device_handle.control_stage == data_in_idle)
-            {
-                printf("txfifoempty data_in_idle\r\n");
-                device_handle.control_stage = data_in;
-                transfer_data();
-            }
-            else if (device_handle.control_stage == data_in_zero)
-            {
-                printf("txfifoempty data_in_zero\r\n");
-                sendZLP(0);
-                device_handle.control_stage = status_out;
-            }
             else if (device_handle.control_stage == status_out)
             {
                 printf("status out\r\n");
@@ -556,6 +553,18 @@ void IN_endpoint_callback(endp_no num, in_endp_int int_val)
                 printf("write cmpt\r\n");
                 // enable the endpoint to recieve setup packet again
                 usb_driver.enableep0(8);
+            }
+            if (device_handle.control_stage == data_in_idle)
+            {
+                printf("txfifoempty data_in_idle\r\n");
+                device_handle.control_stage = data_in;
+                transfer_data();
+            }
+            else if (device_handle.control_stage == data_in_zero)
+            {
+                printf("txfifoempty data_in_zero\r\n");
+                sendZLP(0);
+                device_handle.control_stage = status_out;
             }
             break;
         case toc:
@@ -579,53 +588,61 @@ void IN_endpoint_callback(endp_no num, in_endp_int int_val)
     }
     else if (num == 1)
     {
-        // send_mouse_report();
-    }
-}
-
-void OUT_endpoint_callback(endp_no num, out_endp_int int_val)
-{
-    printf("out endp call\r\n");
-    // after the generation of the output endpoint the core disable the endpoint
-    if (num == 0)
-    {
         switch (int_val)
         {
-        case _nak:
-            /* code */
-            printf("nak out");
+        case xfr_cmpt:
+            ep_1 = unlock;
             break;
-
-        case sts_phs_rx:
-            // code
-            printf("stsphs rx");
-            break;
-
-        case stup:
-            // code
-            printf("setuphase done");
-            break;
-
-        case ep_disd:
-            // code
-            printf("ep disable as per app request");
-            break;
-
-        case xfrc:
-            // code
-            printf("xfrcmpt");
-            break;
-
+        
         default:
             break;
         }
     }
-    else
-    {
-    }
 }
 
-void error_handler(usb_status usb_Status)
-{
-    printf("error %d \r\n", usb_Status);
-}
+    void OUT_endpoint_callback(endp_no num, out_endp_int int_val)
+    {
+        printf("out endp call\r\n");
+        // after the generation of the output endpoint the core disable the endpoint
+        if (num == 0)
+        {
+            switch (int_val)
+            {
+            case _nak:
+                /* code */
+                printf("nak out");
+                break;
+
+            case sts_phs_rx:
+                // code
+                printf("stsphs rx");
+                break;
+
+            case stup:
+                // code
+                printf("setuphase done");
+                break;
+
+            case ep_disd:
+                // code
+                printf("ep disable as per app request");
+                break;
+
+            case xfrc:
+                // code
+                printf("xfrcmpt");
+                break;
+
+            default:
+                break;
+            }
+        }
+        else
+        {
+        }
+    }
+
+    void error_handler(usb_status usb_Status)
+    {
+        printf("error %d \r\n", usb_Status);
+    }
