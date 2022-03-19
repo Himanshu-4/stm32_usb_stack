@@ -34,7 +34,7 @@
 // function used to get the fifo pop and push  address 
 
 
-#define FIFO(i) (( uint32_t * )(USB_OTG_FS_PERIPH_BASE + USB_OTG_FIFO_BASE + ((i) * USB_OTG_FIFO_SIZE)))
+#define FIFO(i) ((__IO uint32_t * )(USB_OTG_FS_PERIPH_BASE + USB_OTG_FIFO_BASE + ((i) * USB_OTG_FIFO_SIZE)))
 
 ///////////////////////////////////////////
 // define some useful macro 
@@ -62,6 +62,14 @@ typedef enum _STATUS_
     timeout,
     halt,
 }usb_status;
+
+typedef enum _USB_ENDPOINT_TYPEDEF 
+{
+control =0,
+isochronus =1, 
+bulk, 
+interrupt
+}endpoint_typedef;
 
 //////////////////
 // size in bytes 
@@ -155,6 +163,11 @@ void actv_remote_signal(void);
 // to deactivate the remote wakeup signal on the usb 
 void deacv_remote_signal(void);
 
+/////// to read data from the fifo
+void read_packet(uint8_t *, uint16_t );
+
+///////////////// to write packet to txfifo
+ void write_packet(uint8_t, const uint8_t *, uint16_t);
 // interrupt handler for the USB core
 void gintsts_handler();  // call this function inside the nvic handler for the USB 
 //////////////////////////////////////////////////////////////////////////////////
@@ -200,17 +213,17 @@ typedef struct _USB_DRIVER
     // configure endpoint 0 
     void (* configure_endpoint0)(endp_size size);
     // configure the in endpoint
-    void (* configure_in_endpoint)(endp_no endpoint_number, endpoint_typedef usb_endpoint_type, uint16_t endpoint_size);
+    void (* configure_in_endpoint)(uint8_t , endpoint_typedef , uint16_t );
     // deconfigure the in endpoint 
-    void (* deconfigure_in_endpoint)(endp_no endpoint_number);
+    void (* deconfigure_in_endpoint)(uint8_t endpoint_number);
     //deconfigure the out endpoint
-    void (* deconfigure_out_endpoint)(endp_no endpoint_number); 
+    void (* deconfigure_out_endpoint)(uint8_t endpoint_number); 
     // to enable the endpoint 0 for request and data reception
     void (* enableep0 )(uint16_t );
     // read the incoming packet 
     void (*read_packet)(uint8_t *, uint16_t );
     // write the packet 
-    void (* write_packet)(uint8_t num,  const void *buffer , uint16_t size);
+    void (* write_packet)(uint8_t num,  const uint8_t *buffer , uint16_t size);
     // set the device address 
     void (* set_deviceaddr)(uint8_t addr);
 }USBdriver;

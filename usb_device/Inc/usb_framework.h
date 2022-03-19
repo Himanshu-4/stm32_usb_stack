@@ -7,17 +7,19 @@
 
 #define PACKED __attribute__((__packed__))
 
-#define lock 0
-#define unlock 1
+#define lock 1
+#define unlock 0
 
-extern const  uint8_t device_descriptor[18];
-extern const  uint8_t hid_report_descriptor[50];
-extern const  uint8_t configuration_desc_comb[34];
+extern const uint8_t device_descriptor[18];
+extern const uint8_t configuration_desc_comb[59];
+extern const uint8_t keyboard_descriptor[45];
+extern const uint8_t mouse_descriptor[74];
+
 
 // string descriptors 
-extern const unsigned char string_0[4];
-extern const unsigned char string_1[18];
-extern const unsigned char string_2[48];
+extern const uint8_t string_0[4];
+extern const uint8_t string_1[18];
+extern const uint8_t string_2[48];
 
 //////////////////////////////////////////////////////////////
 /////////////  defination of the macro ///////////////////
@@ -31,7 +33,7 @@ extern const unsigned char string_2[48];
 
  void usb_send_report(uint8_t * , uint16_t ); 
  
- void init_endp(void);
+
 extern const USBdriver usb_driver;
 
 #endif

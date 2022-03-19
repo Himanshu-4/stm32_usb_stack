@@ -32,7 +32,7 @@ const uint8_t device_descriptor[] ALIGN =
 
 ///////////////////////////////////////////////////////////////////////////////////
 /////////////////// define the hid report descriptor/////////////////////////////////////////
-const uint8_t mouse_descriptor[] ALIGN EXTERNAL  =
+const uint8_t hid_report_descriptor[] ALIGN EXTERNAL  =
 {
 0x05, 0x01, // Usage Page (Generic Desktop Ctrls) 
  
@@ -79,35 +79,6 @@ const uint8_t mouse_descriptor[] ALIGN EXTERNAL  =
 
 };
 
-const uint8_t keyboard_descriptor[] ALIGN EXTERNAL =
-{
-0x05, 0x01, // USAGE_PAGE (Generic Desktop)
-0x09, 0x06, // USAGE (Keyboard)
-0xa1, 0x01, // COLLECTION (Application)
-0x05, 0x07, // USAGE_PAGE (Keyboard)
-0x19, 0xe0, // USAGE_MINIMUM (Keyboard LeftControl)
-0x29, 0xe7, // USAGE_MAXIMUM (Keyboard Right GUI)
-0x15, 0x00, // LOGICAL_MINIMUM (0)
-0x25, 0x01, // LOGICAL_MAXIMUM (1)
-0x75, 0x01, // REPORT_SIZE (1)
-0x95, 0x08, // REPORT_COUNT (8)
-0x81, 0x02, // INPUT (Data,Var,Abs) //1 byte
- 
-0x95, 0x01, // REPORT_COUNT (1)
-0x75, 0x08, // REPORT_SIZE (8)
-0x81, 0x03, // INPUT (Cnst,Var,Abs) //1 byte
- 
-0x95, 0x06, // REPORT_COUNT (6)
-0x75, 0x08, // REPORT_SIZE (8)
-0x15, 0x00, // LOGICAL_MINIMUM (0)
-0x25, 0x65, // LOGICAL_MAXIMUM (101)
-0x05, 0x07, // USAGE_PAGE (Keyboard)
-0x19, 0x00, // USAGE_MINIMUM (Reserved (no event indicated))
-0x29, 0x65, // USAGE_MAXIMUM (Keyboard Application)
-0x81, 0x00, // INPUT (Data,Ary,Abs) //6 bytes
- 
-0xc0 // END_COLLECTION
-};
 
 
 const uint8_t configuration_desc_comb[] ALIGN  =
@@ -116,8 +87,8 @@ const uint8_t configuration_desc_comb[] ALIGN  =
 
     0x09,     // bLength;    // the size of the descriptor (0x09)
     USB_DESCRIPTOR_TYPE_CONFIGURATION,     // bDescriptorType;  // the descriptor type aka constant configuration (0x02)
-    0x3B, 0x00, // wTotalLength;     // the number of the bytes in the configuration descriptor and all of its subordinate descriptor 
-    0x02,     // bNumInterfaces;   // number of interfaces in the configuration
+    0x22, 0x00, // wTotalLength;     // the number of the bytes in the configuration descriptor and all of its subordinate descriptor 
+    0x01,     // bNumInterfaces;   // number of interfaces in the configuration
     0x01,    // bConfigurationValue;  // identifier for set configuration and get configuration request 
     0x00,    // iConfiguration;     //index of string descriptor for the configuration 
     0xA0,   // bmAttributes;       // bus power and remote wakeup settings
@@ -132,37 +103,7 @@ const uint8_t configuration_desc_comb[] ALIGN  =
     0x01,       //   bNumEndpoints; only one endp
     USB_CLASS_HID,     //   bInterfaceClass;  // hid class  
     0x01,       //   bInterfaceSubClass; // boot interface  
-    0x01,       //   bInterfaceProtocol;  //  mouse  
-    0x00,       //   iInterface;          // index of string descriptor for the interface 
-
-    /// HID descriptor
-   
-    0x09,                       //  bLength; // size 
-    DESCRIPTOR_TYPE_HID,       //  bDescriptorType; // 
-    0x11, 0x01,               //  bcdHID;  // bcd encoded version that the hid descriptor and device complies too
-    HID_COUNTRY_NONE,        //  bCountryCode; // the country code
-    0x01,                   //  bNumDescriptor;  // total number of hid report descripotr for the interface 
-    DESCRIPTOR_TYPE_HID_REPORT,       //  bDescriptorType0; // first hid report descripotr type
-    0x2D , 0x00,       //   wDescriptorLength0; // first hid report descripotr length 
-
-    // usb endpoint desc
-
-    0x07,         // bLength; // descriptor size (0x07)
-    USB_DESCRIPTOR_TYPE_ENDPOINT,        // bDescriptorType;  // constant endpoint (0x05)
-    (ENDPOINT1 | DIRECTION_IN),        // bEndpointAddress;  // endpoint number and direction
-    ENDP_TYPE_INTERRUPT,       // bmAttributes;      // transfer type and supplementary information
-    0x08, 0x00,         // wMaxPacketSize;    // maximum packet size suported 
-    0x01,     // bInterval; 
-   
-     //////////////// interface 1
-    0x09,                              //   bLength; // size of descriptor  (0x09)
-    USB_DESCRIPTOR_TYPE_INTERFACE,       //   bDescriptorType; // the constant interface (0x04)
-    0x01,       //   bInterfaceNumber; // number identifying this interface 
-    0x00,       //   bAlternateSetting;  // a number that identifies a descriptor with alternate setting for this interface number
-    0x01,       //   bNumEndpoints; only one endp
-    USB_CLASS_HID,     //   bInterfaceClass;  // hid class  
-    0x01,       //   bInterfaceSubClass; // boot interface  
-    0x02,       //   bInterfaceProtocol;  //  keyboard 
+    0x02,       //   bInterfaceProtocol;  //  mouse  
     0x00,       //   iInterface;          // index of string descriptor for the interface 
 
     /// HID descriptor
@@ -179,12 +120,13 @@ const uint8_t configuration_desc_comb[] ALIGN  =
 
     0x07,         // bLength; // descriptor size (0x07)
     USB_DESCRIPTOR_TYPE_ENDPOINT,        // bDescriptorType;  // constant endpoint (0x05)
-    (ENDPOINT2 | DIRECTION_IN),        // bEndpointAddress;  // endpoint number and direction
+    (ENDPOINT1 | DIRECTION_IN),        // bEndpointAddress;  // endpoint number and direction
     ENDP_TYPE_INTERRUPT,       // bmAttributes;      // transfer type and supplementary information
-    0x04, 0x00,         // wMaxPacketSize;    // maximum packet size suported 
-    0x01     // bInterval; 
+    0x03, 0x00,         // wMaxPacketSize;    // maximum packet size suported 
+    0x02      // bInterval; 
+   
+  
 };
-
 //////////////////// string descriptor /////////////////////////////////////////////////////////////////////
 const uint8_t string_0[] ALIGN =
 {
@@ -195,7 +137,7 @@ const uint8_t string_0[] ALIGN =
 
 const uint8_t  string_1[] ALIGN = 
 {
-    0x12,   // length of string 
+    16,   // length of string 
    USB_DESCRIPTOR_TYPE_STRING,    // string descriptor 
     0x48, 0x00,
     0x69, 0x00,              // manufactureer string himanshu 
@@ -209,7 +151,7 @@ const uint8_t  string_1[] ALIGN =
 
 const uint8_t string_2[] ALIGN = 
 {
-    0x30,     // length of string 
+    46,     // length of string 
     USB_DESCRIPTOR_TYPE_STRING,  // string descriptor
     0x48,0x00,
     0x69,0x00,
@@ -237,4 +179,3 @@ const uint8_t string_2[] ALIGN =
 
 
 };
-

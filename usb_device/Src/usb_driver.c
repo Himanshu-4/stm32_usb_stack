@@ -1,5 +1,6 @@
 #include "usb_driver.h"
 
+extern uint8_t ep_1;
 ///////////////////static function start here //////////////////////
 
 /********************
@@ -16,7 +17,7 @@ static usb_status flush_rxfifo()
       {
          return timeout;
       }
-   } while (READ_bit(USB_OTG_GLOBAL->GRSTCTL, USB_OTG_GRSTCTL_TXFFLSH));
+   } while (READ_bit(USB_OTG_GLOBAL->GRSTCTL, USB_OTG_GRSTCTL_RXFFLSH));
 
    return ok;
 }
@@ -50,78 +51,95 @@ static usb_status flush_txfifo(endp_no num)
  * @brief call this function after configure the fifo size
  *
  */
-static void refresh_FIFO_start_address()
+// static void refresh_FIFO_start_address()
+// {
+//    uint32_t depth = 0;
+//    // the first changeable address begins after the region of rxfifo
+//    // first take the depth of Rx fifo
+//    uint32_t start_addr = 0;
+//    start_addr = (USB_OTG_GLOBAL->GRXFSIZ & 0xFFFFUL);
+
+//    depth = FLD2VAL(USB_OTG_TX0FD ,USB_OTG_GLOBAL->DIEPTXF0_HNPTXFSIZ);
+//    // update the start address of txfifo 0
+//    USB_OTG_GLOBAL->DIEPTXF0_HNPTXFSIZ = (VAL2FLD(USB_OTG_TX0FD , depth) | VAL2FLD(USB_OTG_TX0FSA , start_addr));
+
+//    // the next start address is where the last tx fifo  ends
+//    start_addr += (FLD2VAL(USB_OTG_TX0FD ,USB_OTG_GLOBAL->DIEPTXF0_HNPTXFSIZ ));
+
+//    // update the tx fifo for the rest of the endpoint
+
+//    for (uint8_t endp_num = 0; endp_num < ENDPOINTCOUNT - 1; endp_num++)
+//    {
+      
+//       depth = FLD2VAL(USB_OTG_DIEPTXF_INEPTXFD , USB_OTG_GLOBAL->DIEPTXF[endp_num]);
+//       USB_OTG_GLOBAL->DIEPTXF[endp_num] = ( VAL2FLD(USB_OTG_DIEPTXF_INEPTXFD , depth) | VAL2FLD(USB_OTG_DIEPTXF_INEPTXSA , start_addr));
+
+//       // update the start addressof the new fifo
+//       start_addr += (FLD2VAL(USB_OTG_DIEPTXF_INEPTXSA ,USB_OTG_GLOBAL->DIEPTXF[endp_num] ));
+//    }
+// }
+
+// /////////////////////////////////////////////////////
+// /*****************
+//  * @name configure rx fifo
+//  * @param size the size of the max out endpoint
+//  * @note this fifo is shared between all of the out endpoint
+//  */
+// static void configure_rx_fifo(uint16_t size)
+// {
+//    // consider the space required to save status packet in rxfifo and get space in words
+//    size = 10 + (2 * ((size / 4) + 1));
+
+//    // first clear the size then set it
+//    CLEAR_bit(USB_OTG_GLOBAL->GRXFSIZ, USB_OTG_GRXFSIZ_RXFD);
+//    // configure the depth of the fifo
+//    SET_bit(USB_OTG_GLOBAL->GRXFSIZ, VAL2FLD(USB_OTG_GRXFSIZ_RXFD, size));
+
+//    // update the new start addresses
+//    refresh_FIFO_start_address();
+// }
+
+// /////////////////////////////////////////////
+// /**************
+//  * @name configure tx fifo
+//  * @param endp_no
+//  * @param size
+//  * @note configure the tx fifo size
+//  */
+// static void configure_tx_fifo(uint8_t num, uint16_t size)
+// {
+//       // get the FIFO size in 32 but words
+//    size = (size + 3) / 4;
+     
+//      if(size < 16) return;
+//    if (num == 0)
+//    {
+//       CLEAR_bit(USB_OTG_GLOBAL->DIEPTXF0_HNPTXFSIZ, USB_OTG_TX0FD);
+//       SET_bit(USB_OTG_GLOBAL->DIEPTXF0_HNPTXFSIZ, VAL2FLD(USB_OTG_TX0FD, size));
+//    }
+
+//    else
+//    {
+//       CLEAR_bit(USB_OTG_GLOBAL->DIEPTXF[num-1], USB_OTG_DIEPTXF_INEPTXFD);
+//       SET_bit(USB_OTG_GLOBAL->DIEPTXF[num -1], VAL2FLD(USB_OTG_DIEPTXF_INEPTXFD, size));
+//    }
+//    // update the new start addresses
+//    refresh_FIFO_start_address();
+// }
+
+////////////////////////////////////////////////////////////
+///////////////// so by default you have to set the fifio address and depth according to 16 word size
+
+static void configure_fifo(void)
 {
-   // the first changeable address begins after the region of rxfifo
-   // first take the depth of Rx fifo
-   uint16_t start_addr = (USB_OTG_GLOBAL->GRXFSIZ & 0xFFFF) * 4;
+   USB_OTG_GLOBAL->GRXFSIZ = 0x2CUL;
 
-   // update the start address of txfifo 0
-   SET_bit(USB_OTG_GLOBAL->DIEPTXF0_HNPTXFSIZ, start_addr);
+   USB_OTG_GLOBAL->DIEPTXF0_HNPTXFSIZ = 0x10002CUL;
+   USB_OTG_GLOBAL->DIEPTXF[0] = 0x10003CUL;
+   USB_OTG_GLOBAL->DIEPTXF[1] = 0x10004CUL;
+   USB_OTG_GLOBAL->DIEPTXF[2] = 0x10005CUL;
 
-   // the next start address is where the last tx fifo  ends
-   start_addr += ((USB_OTG_GLOBAL->DIEPTXF0_HNPTXFSIZ >> 16) * 4);
-
-   // update the tx fifo for the rest of the endpoint
-
-   for (uint8_t endp_num = 0; endp_num < ENDPOINTCOUNT - 1; endp_num++)
-   {
-      SET_bit(USB_OTG_GLOBAL->DIEPTXF[endp_num], start_addr);
-
-      // update the start addressof the new fifo
-      start_addr += ((USB_OTG_GLOBAL->DIEPTXF[endp_num] >> 16) * 4);
-   }
 }
-
-/////////////////////////////////////////////////////
-/*****************
- * @name configure rx fifo
- * @param size the size of the max out endpoint
- * @note this fifo is shared between all of the out endpoint
- */
-static void configure_rx_fifo(uint16_t size)
-{
-   // consider the space required to save status packet in rxfifo and get space in words
-   size = 10 + (2 * ((size / 4) + 1));
-
-   // first clear the size then set it
-   CLEAR_bit(USB_OTG_GLOBAL->GRXFSIZ, USB_OTG_GRXFSIZ_RXFD);
-   // configure the depth of the fifo
-   SET_bit(USB_OTG_GLOBAL->GRXFSIZ, VAL2FLD(USB_OTG_GRXFSIZ_RXFD, size));
-
-   // update the new start addresses
-   refresh_FIFO_start_address();
-}
-
-/////////////////////////////////////////////
-/**************
- * @name configure tx fifo
- * @param endp_no
- * @param size
- * @note configure the tx fifo size
- */
-static void configure_tx_fifo(endp_no num, uint16_t size)
-{
-   // get the FIFO size in 32 but words
-   size = (size + 3) / 4;
-
-   if (num == 0)
-   {
-      // first clear the size then set it
-      WRITE_reg(USB_OTG_GLOBAL->DIEPTXF0_HNPTXFSIZ, 0);
-      SET_bit(USB_OTG_GLOBAL->DIEPTXF0_HNPTXFSIZ, VAL2FLD(USB_OTG_TX0FD, size));
-   }
-
-   else
-   {
-      // first clear the size then set it
-      WRITE_reg(USB_OTG_GLOBAL->DIEPTXF[num], 0);
-      SET_bit(USB_OTG_GLOBAL->DIEPTXF[num], VAL2FLD(USB_OTG_DIEPTXF_INEPTXFD, size));
-   }
-   // update the new start addresses
-   refresh_FIFO_start_address();
-}
-
 ///////////////////////////////////////////////////////////////////////
 /*******
  * @name enumuration done interrupt
@@ -132,6 +150,7 @@ static void enumdone_handler()
    // we have to confgiures the endpoint 0 for recieving the setup packet
    // you can hardcore the endpoint 0 size but it may not be the case you can use 64 max value here but for low spped use only 8
    configure_endpoint0(_64);
+
 }
 
 //////////////////////////////////////////////////////////////////////////////////
@@ -213,79 +232,7 @@ static void RXflvl_handler()
    }
 }
 
-////////////////////////////////////////////
-/*************************
- * @name to read the packet from the rxfifo
- * @param pointer to a buffer
- * @param size of the buffer
- */
-static void read_packet(uint8_t *buffer, uint16_t size)
-{
-   // first to get the pop addr there is only one rx fifio for all the endpoints
-   __IO uint32_t *__IO fifo = FIFO(0);
-   for (; size >= 4; size -= 4, buffer += 4)
-   {
-      // pops one 32 bit word of data
-      *((uint32_t *)buffer) = *fifo;
-   }
 
-   if (size > 0)
-   {
-      // pops the last remaining byte
-      uint32_t data = *fifo;
-      for (; size > 0; size--, data >>= 8)
-      {
-         *((uint8_t *)buffer++) = ((uint8_t)(0xff & data));
-      }
-   }
-}
-
-/////////////////////////////////////////////////
-/**********
- * @name func to write packet to the fifo
- * @param endpoint number
- * @param pointer to bufer
- * @param size of the pointer
- *
- */
-static void write_packet(uint8_t num, const void *buffer, uint16_t size)
-{
-
-   // set the size to the ITXFSIZ , packet count and Xfersize
-   CLEAR_bit(IN_ENDPOINT(num)->DIEPTSIZ, USB_OTG_DIEPTSIZ_PKTCNT | USB_OTG_DIEPTSIZ_XFRSIZ);
-   SET_bit(IN_ENDPOINT(num)->DIEPTSIZ, VAL2FLD(USB_OTG_DIEPTSIZ_PKTCNT, 1) | VAL2FLD(USB_OTG_DIEPTSIZ_XFRSIZ, size));
-   CLEAR_bit(IN_ENDPOINT(num)->DIEPCTL, USB_OTG_DIEPCTL_STALL);
-   // after writing data to the FIFO clear nak , activate the endpoint
-   SET_bit(IN_ENDPOINT(num)->DIEPCTL, USB_OTG_DIEPCTL_EPENA | USB_OTG_DIEPCTL_CNAK);
-
-   __IO uint32_t *__IO fifo = FIFO(num);
-
-   // get the size in 32 bit word
-   size = (size + 3) / 4;
-
-   for (; size > 0; size--, buffer += 4)
-   {
-      // push the data to the tx fifo
-      *fifo = *((uint32_t *)buffer);
-   }
-
-   // enable the in endpoint tx fifo empty mask
-   SET_bit(USB_OTG_DEVICE->DIEPEMPMSK, _BV(num));
-}
-
-/////////////////////////////////////////////////////////////////////////////
-/////////////////////////////////////////////////////////////////////////////////
-static void reset_fifo()
-{
-   // reset the RX FIFO
-   WRITE_reg(USB_OTG_GLOBAL->GRXFSIZ, 0);
-   WRITE_reg(USB_OTG_GLOBAL->DIEPTXF0_HNPTXFSIZ, 0);
-   for (uint8_t i = 1; i < ENDPOINTCOUNT; i++)
-   {
-      WRITE_reg(USB_OTG_GLOBAL->DIEPTXF[i], 0);
-   }
-}
-//////////////////////////////////////////////////////////////////////////////
 /***************
  * @name set device addr
  * @param address of device
@@ -438,9 +385,7 @@ static void reset_callback()
    // configure the device after a reset callback
 
    // enable the core interrupts
-   SET_bit(USB_OTG_GLOBAL->GINTMSK, USB_OTG_GINTMSK_RXFLVLM | USB_OTG_GINTMSK_ESUSPM |
-                                        USB_OTG_GINTMSK_USBRST | USB_OTG_GINTMSK_ENUMDNEM |
-                                        USB_OTG_GINTMSK_IEPINT | USB_OTG_GINTMSK_OEPINT);
+   SET_bit(USB_OTG_GLOBAL->GINTMSK, USB_OTG_GINTMSK_RXFLVLM | USB_OTG_GINTMSK_ESUSPM | USB_OTG_GINTMSK_WUIM | USB_OTG_GINTMSK_USBRST | USB_OTG_GINTMSK_ENUMDNEM | USB_OTG_GINTMSK_USBSUSPM | USB_OTG_GINTMSK_IEPINT | USB_OTG_GINTMSK_OEPINT);
 
    // clear all pending core interrupt
    WRITE_reg(USB_OTG_GLOBAL->GINTSTS, 0xFFFFFFFF);
@@ -479,11 +424,11 @@ static void devinit()
 {
    // // deconfigure the endpint to the RESET level
 
-   // for (uint8_t i = 0; i < (ENDPOINTCOUNT); i++)
-   // {
-   //    deconfigure_in_endpoint(i);
-   //    deconfigure_out_endpoint(i);
-   // }
+   for (uint8_t i = 0; i < (ENDPOINTCOUNT); i++)
+   {
+      deconfigure_in_endpoint(i);
+      deconfigure_out_endpoint(i);
+   }
 
    // restart the PHY clock
    WRITE_reg(USB_OTG_PCGCCTL, 0);
@@ -495,7 +440,7 @@ static void devinit()
    // enable the Vbus sensing device
    SET_bit(USB_OTG_GLOBAL->GCCFG, USB_OTG_GCCFG_VBUSBSEN);
 
-   reset_fifo();
+
 }
 
 ///////////////////////////////////////////////////////////////////////////////////
@@ -565,7 +510,7 @@ static void disconnect()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 //////////////////////////////////////////////////////////////////////////////////
-void __attribute__((externally_visible)) gintsts_handler()
+void __attribute__((externally_visible)) gintsts_handler(void)
 {
    volatile uint32_t gintsts = USB_OTG_GLOBAL->GINTSTS;
 
@@ -574,11 +519,12 @@ void __attribute__((externally_visible)) gintsts_handler()
    if (READ_bit(gintsts, USB_OTG_GINTSTS_WKUINT))
    {
       // interrupt generated by the remote wakeup
-
+      printf("wkuip\r\n");
       SET_bit(USB_OTG_GLOBAL->GINTSTS, USB_OTG_GINTSTS_WKUINT);
       deacv_remote_signal();
+      ep_1 = 0;
    }
-   if (READ_bit(gintsts, USB_OTG_GINTSTS_OEPINT))
+   else if (READ_bit(gintsts, USB_OTG_GINTSTS_OEPINT))
    {
       OUT_endpoint_Irqhandler();
       // this intrerrupt dont require to be cleared automatically cleared by the usb core
@@ -599,24 +545,22 @@ void __attribute__((externally_visible)) gintsts_handler()
    }
    else if (READ_bit(gintsts, USB_OTG_GINTSTS_USBRST))
    {
-      printf(" usb reset\r\n");
+      printf("usb reset\r\n");
 
       for (uint8_t i = 0; i < (ENDPOINTCOUNT - 1); i++)
       {
          deconfigure_out_endpoint(i);
          deconfigure_in_endpoint(i);
       }
-      reset_fifo();
-
-      // this function is implemented in the framework layer
+           // this function is implemented in the framework layer
       usb_reset_recv_callback();
-
+      configure_fifo();
       CLEAR_IT(USB_OTG_GINTSTS_USBRST);
    }
    else if (READ_bit(gintsts, USB_OTG_GINTSTS_USBSUSP))
    {
       // usb suspended
-      printf("usb suspended\r\n");
+      printf("suspended\r\n");
 
       CLEAR_IT(USB_OTG_GINTSTS_USBSUSP);
    }
@@ -640,21 +584,21 @@ void __attribute__((externally_visible)) gintsts_handler()
       CLEAR_IT(USB_OTG_GINTSTS_RXFLVL);
    }
 
-   else if (READ_bit(gintsts, USB_OTG_GINTSTS_GINAKEFF))
-   {
-      // thiis indicaate that the NAK bit set in the IN DCTL has taken effect
-      printf("globalin nak effective interrupt\r\n");
-      // to clear the bit we need to set the CGINAK in DCTL reg
-      SET_bit(USB_OTG_DEVICE->DCTL, USB_OTG_DCTL_CGINAK);
+   // else if (READ_bit(gintsts, USB_OTG_GINTSTS_GINAKEFF))
+   // {
+   //    // thiis indicaate that the NAK bit set in the IN DCTL has taken effect
+   //    printf("globalin nak effective interrupt\r\n");
+   //    // to clear the bit we need to set the CGINAK in DCTL reg
+   //    SET_bit(USB_OTG_DEVICE->DCTL, USB_OTG_DCTL_CGINAK);
 
-      // call the handler routine
-   }
-   else if (READ_bit(gintsts, USB_OTG_GINTSTS_BOUTNAKEFF))
-   {
-      // this bit is cleared by the setting the global out nak bit in the otg_FS_DCT
-      printf("global outnak\r\n");
-      SET_bit(USB_OTG_DEVICE->DCTL, USB_OTG_DCTL_CGONAK);
-   }
+   //    // call the handler routine
+   // }
+   // else if (READ_bit(gintsts, USB_OTG_GINTSTS_BOUTNAKEFF))
+   // {
+   //    // this bit is cleared by the setting the global out nak bit in the otg_FS_DCT
+   //    printf("global outnak\r\n");
+   //    SET_bit(USB_OTG_DEVICE->DCTL, USB_OTG_DCTL_CGONAK);
+   // }
 }
 //////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////
@@ -745,6 +689,7 @@ void actv_remote_signal(void)
    // before wakimg up the host first check if the usb is in suspended state
    if (READ_bit(USB_OTG_DEVICE->DSTS, USB_OTG_DSTS_SUSPSTS))
    {
+      printf("rm sgnl\r\n");
       // activate the remote wakeup signaling
       SET_bit(USB_OTG_DEVICE->DCTL, USB_OTG_DCTL_RWUSIG);
    }
@@ -802,15 +747,14 @@ void configure_endpoint0(endp_size size)
    SET_bit(USB_OTG_DEVICE->DAINTMSK, _BV(USB_OTG_DAINTMSK_OEPM_Pos) | _BV(USB_OTG_DAINTMSK_IEPM_Pos));
 
    // configure the maximim packet size , activate the endpoint and nack the endpoint
-   SET_bit(IN_ENDPOINT(0)->DIEPCTL, VAL2FLD(USB_OTG_DIEPCTL_MPSIZ, size));
+   SET_bit(IN_ENDPOINT(0)->DIEPCTL, USB_OTG_DIEPCTL_SNAK | VAL2FLD(USB_OTG_DIEPCTL_MPSIZ, size));
 
    // set the max packet size of the endpoint
-   SET_bit(OUT_ENDPOINT(0)->DOEPCTL, VAL2FLD(USB_OTG_DOEPCTL_MPSIZ, size));
+   SET_bit(OUT_ENDPOINT(0)->DOEPCTL, USB_OTG_DIEPCTL_SNAK | VAL2FLD(USB_OTG_DOEPCTL_MPSIZ, size));
 
    // we have to configure the size of fifo
    // 64 bytes is the max packet size for the full speed out endp0
-   configure_rx_fifo(64);
-   configure_tx_fifo(0, 64);
+   
 
    // enable endp0 for receving out request
    // since the size of the request is 8 bytes
@@ -823,10 +767,11 @@ void configure_in_endpoint(uint8_t endpoint_number, endpoint_typedef usb_endpoin
    /// unmask all interrrupt for the targeted endpoint
    SET_bit(USB_OTG_DEVICE->DAINTMSK, _BV(endpoint_number));
    //// activate the endpoint , set ep handshake to nack , set DATA0 PID ()
-   SET_bit(IN_ENDPOINT(endpoint_number)->DIEPCTL, USB_OTG_DIEPCTL_SD0PID_SEVNFRM | USB_OTG_DIEPCTL_SNAK |
-                                                      VAL2FLD(USB_OTG_DIEPCTL_EPTYP, usb_endpoint_type) | VAL2FLD(USB_OTG_DIEPCTL_MPSIZ, endpoint_size) | VAL2FLD(USB_OTG_DIEPCTL_TXFNUM, endpoint_number));
-   ActivateEP(1, IN);
-   configure_tx_fifo(endpoint_number, endpoint_size);
+   SET_bit(IN_ENDPOINT(endpoint_number)->DIEPCTL, USB_OTG_DIEPCTL_USBAEP | USB_OTG_DIEPCTL_SD0PID_SEVNFRM  | USB_OTG_DIEPCTL_SNAK |  VAL2FLD(USB_OTG_DIEPCTL_EPTYP, usb_endpoint_type) | VAL2FLD(USB_OTG_DIEPCTL_MPSIZ, endpoint_size) | VAL2FLD(USB_OTG_DIEPCTL_TXFNUM, endpoint_number));
+  
+   // this will program the fifo size register to 16 words minimum
+  
+
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -836,10 +781,13 @@ void configure_out_endpoint(uint8_t endpoint_num, endpoint_typedef usb_endpoint_
    SET_bit(USB_OTG_DEVICE->DAINTMSK, _BV((endpoint_num + 16)));
 
    // activate the endpoint , set the ep hanshake to nack , set data pid
-   SET_bit(OUT_ENDPOINT(endpoint_num)->DOEPCTL, USB_OTG_DOEPCTL_SNAK |
+   SET_bit(OUT_ENDPOINT(endpoint_num)->DOEPCTL, USB_OTG_DOEPCTL_USBAEP | USB_OTG_DOEPCTL_SNAK |
                                                     VAL2FLD(USB_OTG_DOEPCTL_EPTYP, usb_endpoint_type) | VAL2FLD(USB_OTG_DOEPCTL_MPSIZ, endpoint_size));
 
    // the size of the endpoint is fixed to maximum i.e. 64 bytes
+   ActivateEP(endpoint_num, OUT);
+
+
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -866,6 +814,8 @@ void deconfigure_in_endpoint(endp_no num)
    {
       error_handler(error);
    }
+
+
 }
 
 ///////////////////////////////////////////////////////////////////////
@@ -893,6 +843,70 @@ void deconfigure_out_endpoint(endp_no num)
       SET_bit(OUT_ENDPOINT(num)->DOEPCTL, USB_OTG_DOEPCTL_EPDIS);
    }
 }
+
+
+////////////////////////////////////////////
+/*************************
+ * @name to read the packet from the rxfifo
+ * @param pointer to a buffer
+ * @param size of the buffer
+ */
+void read_packet(uint8_t *buffer, uint16_t size)
+{
+   // first to get the pop addr there is only one rx fifio for all the endpoints
+   __IO uint32_t *__IO fifo = FIFO(0);
+   for (; size >= 4; size -= 4, buffer += 4)
+   {
+      // pops one 32 bit word of data
+      *((uint32_t *)buffer) = *fifo;
+   }
+
+   if (size > 0)
+   {
+      // pops the last remaining byte
+      uint32_t data = *fifo;
+      for (; size > 0; size--, data >>= 8)
+      {
+         *((uint8_t *)buffer++) = ((uint8_t)(0xff & data));
+      }
+   }
+}
+
+/////////////////////////////////////////////////
+/**********
+ * @name func to write packet to the fifo
+ * @param endpoint number
+ * @param pointer to bufer
+ * @param size of the pointer
+ *
+ */
+ void write_packet(uint8_t num, const uint8_t *buffer, uint16_t size)
+{
+
+   // set the size to the ITXFSIZ , packet count and Xfersize
+   CLEAR_bit(IN_ENDPOINT(num)->DIEPTSIZ, USB_OTG_DIEPTSIZ_PKTCNT | USB_OTG_DIEPTSIZ_XFRSIZ);
+   SET_bit(IN_ENDPOINT(num)->DIEPTSIZ, VAL2FLD(USB_OTG_DIEPTSIZ_PKTCNT, 1) | VAL2FLD(USB_OTG_DIEPTSIZ_XFRSIZ, size));
+   CLEAR_bit(IN_ENDPOINT(num)->DIEPCTL, USB_OTG_DIEPCTL_STALL);
+   // after writing data to the FIFO clear nak , activate the endpoint
+   SET_bit(IN_ENDPOINT(num)->DIEPCTL, USB_OTG_DIEPCTL_EPENA | USB_OTG_DIEPCTL_CNAK);
+
+
+
+   // get the size in 32 bit word
+   size = (size + 3) / 4;
+
+   for (; size > 0; size--, buffer += 4)
+   {
+      // push the data to the tx fifo
+      *FIFO(num) = *((uint32_t *)buffer);
+   }
+
+   // enable the in endpoint tx fifo empty mask
+   SET_bit(USB_OTG_DEVICE->DIEPEMPMSK, _BV(num));
+}
+
+/////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////
 
 //////////////////////////////////////////////////
 //////////   Weak function defination here that user want to implement in the main.c

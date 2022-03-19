@@ -1,10 +1,10 @@
 #ifndef _USB_STANDARD_H_
 #define _USB_STANDARD_H_
 
-
+#include <stdint.h>
 // defination of the usb standard type 
 #define STM32_VID 0x0483
-#define STM32_PID 0x5740
+#define STM32_PID 0x574B
 
 #define HIGH_BYTE(x) ((uint8_t )((0xFF00U & (x))>>8))
 #define LOW_BYTE(x) ((uint8_t)(0x00FFU & (x)))  
@@ -13,15 +13,11 @@
 //////////////////////////////////////////////////////
 ///////////  the maximum packet size for the default pipe 
 #define MAX_SIZE_EP0  (64)
-#include <stdint.h>
+
+ 
+
 // some enum defination here 
-typedef enum _USB_ENDPOINT_TYPEDEF 
-{
-control =0,
-isochronus =1, 
-bulk, 
-interrupt
-}endpoint_typedef;
+
 
 // different device state
 typedef enum _DEVICE_STATE

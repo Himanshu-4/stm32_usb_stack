@@ -19,6 +19,7 @@ USBrequest *request;
 // used to when iff app wants to send a stall to the endpoint
 uint8_t set_stall = false;
 
+static void usbd_configure(void);
 void usbd_init()
 {
 
@@ -26,6 +27,8 @@ void usbd_init()
     usb_driver.USB_Msp_init();
     usb_driver.initialize_core();
     usb_driver.connect();
+
+  
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -43,7 +46,7 @@ void usbd_init()
 static void sendZLP(uint8_t ep_num)
 {
 
-    usb_driver.write_packet(ep_num, NULL, 0);
+    write_packet(ep_num, NULL, 0);
 }
 //////////////////////////////////////////////////////////////////////////////
 /******
@@ -65,7 +68,7 @@ static void reset_devicehandle()
  */
 static void reset_request_structure()
 {
-    memset(request, 0, sizeof(request));
+    memset(request, 0, sizeof(USBrequest));
     memset(req_buff, 0, sizeof(req_buff));
 }
 ////////////////////////////////////////////////////////////////////////////
@@ -79,7 +82,7 @@ static void transfer_data()
     if (insize > MAX_SIZE_EP0) // if the size of data to send is greater than max size of endpoint
     {
         // write data to the buff and also increment the buffer and then again send the data when staus is done
-        usb_driver.write_packet(0, inbuff, insize);
+        write_packet(0, inbuff, MAX_SIZE_EP0);
 
         // after transmission increment the bufferpointer  and decrement the size
         inbuff += MAX_SIZE_EP0;
@@ -92,11 +95,7 @@ static void transfer_data()
     else if (insize == MAX_SIZE_EP0) // if size of data is equal to the size of endpoint
     {
         // write data to the buff and also we have to send a zlp to indicate the end of transaction
-        usb_driver.write_packet(0, inbuff, insize);
-
-        // after transmission remove the data from the buffer
-        inbuff = NULL;
-        insize = 0;
+        write_packet(0, inbuff, MAX_SIZE_EP0);
 
         // wait for the status stage or transfer complete interrupt from the usb core
         // send a zero length packet and then wait for status stage
@@ -105,11 +104,7 @@ static void transfer_data()
     else if (insize < MAX_SIZE_EP0) // if size of data is less than the max endpoint size
     {
         // we have to transmit the data to the fifo and wait for the transfer to complete
-        usb_driver.write_packet(0, inbuff, insize);
-
-        // after transmission remove the data from the buff
-        insize = 0;
-        inbuff = NULL;
+        write_packet(0, inbuff, insize);
 
         // wait for the status stage or xfr cmpt interrupt from usb core
         // initiate the status stage
@@ -126,9 +121,11 @@ static void transfer_data()
 static void usbd_configure()
 {
     // activate the endpoint in the current configuration
-    configure_in_endpoint(1, interrupt, 3);
+   configure_in_endpoint(1, interrupt , 4);
+//    configure_in_endpoint(2, interrupt , 8);
 
-    sendZLP(1);
+  sendZLP(1);
+//   sendZLP(2);
 }
 
 /////////////////////////////////////////////////////////////////////////
@@ -137,7 +134,7 @@ static void usbd_configure()
  * @param void
  * @note used to process the different descriptor that host need ffrom the device
  */
-static inline void process_get_descriptor()
+static void process_get_descriptor()
 {
     switch (HIGH_BYTE(request->wValue))
     {
@@ -159,23 +156,27 @@ static inline void process_get_descriptor()
         // we have to give the string descriptor here
         switch (LOW_BYTE(request->wValue))
         {
-        case 0:
+        case 0x00:
             printf("string0");
             inbuff = string_0;
             insize = MIN(request->wLength, sizeof(string_0));
             device_handle.control_stage = data_in;
             break;
-        case 1: // the manufacturer string
-            printf("str 1");
+        case 0x01: // the manufacturer string
+            printf("str1");
             inbuff = string_1;
             insize = MIN(request->wLength, sizeof(string_1));
             device_handle.control_stage = data_in;
             break;
-        case 2: // the product string
-            printf("str 2");
+        case 0x02: // the product string
+            printf("str2");
             inbuff = string_2;
             insize = MIN(request->wLength, sizeof(string_2));
             device_handle.control_stage = data_in;
+            break;
+
+        default:
+                set_stall = true;
             break;
         }
         break;
@@ -293,10 +294,18 @@ static void process_standard_request()
  * @name process idle request
  * @note process the set idle rate of the endpoint
  */
-static void process_idle()
+static void process_idle_0(void)
 {
+    printf("idle0\r\n");
     // send zero report
-    sendZLP(1);
+//    sendZLP(1);
+
+}
+
+static void process_idle_1(void)
+{
+    printf("idle1\r\n");
+    // sendZLP(2);
 }
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /************
@@ -309,11 +318,25 @@ static void process_class_request(void)
     switch (request->bRequest)
     {
     case HID_SET_IDLE:
-
-        process_idle();
+        printf("set_isle\r\n");
+         switch (LOW_BYTE(request->wIndex))
+         {
+         case 0: /// mouse report
+             process_idle_0();
+             break;
+         case 1:  ///// keyboard report
+            process_idle_1();
+            break;
+         default:
+         set_stall =  true;
+             break;
+         }
         device_handle.control_stage = status_in;
         break;
-
+    case HID_SET_REPORT:
+        printf("set_report\r\n");
+        device_handle.control_stage = data_out;
+        break;
     default:
         set_stall = true;
         break;
@@ -329,17 +352,29 @@ static void process_standard_interface(void)
     switch (HIGH_BYTE(request->wValue))
     {
     case DESCRIPTOR_TYPE_HID_REPORT:
-
-        // we have to give the hid report descriptor
-        inbuff = hid_report_descriptor;
-        insize = MIN(request->wLength, sizeof(hid_report_descriptor));
-        device_handle.control_stage = data_in;
+        //// mouse descriptor
+        switch (LOW_BYTE(request->wIndex))
+        {
+        case 0:
+            printf("mouse desc\r\n");
+            inbuff = mouse_descriptor;
+            insize = MIN(request->wLength, sizeof(mouse_descriptor));
+            device_handle.control_stage = data_in;
+            break;       
+        case 1:
+         //// keyboard descriptor
+            printf("keyboard desc\r\n");
+            inbuff = keyboard_descriptor;
+            insize = MIN(request->wLength, sizeof(keyboard_descriptor));
+            device_handle.control_stage = data_in;
+             break;
+        }
         break;
-
-    default:
-        set_stall = true;
-        break;
-    }
+        default:
+            set_stall = true;
+            break;
+        }
+    
 }
 //////////////////////////////////////////////////////////////////////////
 /*******
@@ -391,8 +426,13 @@ static void process_request()
 /////
 void usb_send_report(uint8_t *ptr, uint16_t size)
 {
-    if (ep_1 == lock)return;
-    else ep_1  = lock;
+    if (device_handle.dev_state != configured)
+        return;
+    printf("valep %d\r\n", ep_1);
+    if (ep_1 == lock)
+        return;
+    else
+        ep_1 = lock;
     // send the report via the endpoint
     usb_driver.write_packet(1, ptr, size);
     // activate the USB to send report
@@ -452,6 +492,10 @@ void setup_stage_cmpt_callback(uint8_t endp_num)
     {
         transfer_data();
     }
+    else if (device_handle.control_stage == data_out)
+    {
+        usb_driver.enableep0(request->wLength);
+    }
 }
 
 /******
@@ -487,6 +531,10 @@ void out_data_recv_callback(uint8_t endp_num, uint16_t datalen)
     else if (device_handle.control_stage == data_out)
     {
         // read the data from the RX fifo
+        uint8_t set_report =0;
+        usb_driver.read_packet(&set_report , datalen);
+        device_handle.control_stage = status_in;
+        printf("set_report %d\r\n",set_report);
     }
 }
 
@@ -505,6 +553,7 @@ void out_Xfer_cmpt_callbcak(uint8_t endp_num)
     else if (device_handle.control_stage == status_in)
     {
         // send the zLP
+        sendZLP(0);
     }
     else if (device_handle.control_stage == data_out_idle)
     {
@@ -586,20 +635,39 @@ void IN_endpoint_callback(endp_no num, in_endp_int int_val)
             break;
         }
     }
+
     else if (num == 1)
     {
         switch (int_val)
         {
         case xfr_cmpt:
             ep_1 = unlock;
+            printf("in1cmp\r\n");
             break;
-        
-        default:
+        case txfe:
+            printf("1txfifo empty\r\n");
+            break;
+        case toc:
+            printf("1 timeout condition\r\n");
+            break;
+        case in_token_txfe:
+
+            printf("1 in token rx txfifo empty\r\n");
+            break;
+        case nak:
+            printf("1 nak interrupt\r\n");
+            break;
+        case inepne:
+
+            printf("1 core sampled nak\r\n");
+            break;
+        case epdisd:
+            printf("1 in endp disbl\r\n");
             break;
         }
     }
-}
 
+}
     void OUT_endpoint_callback(endp_no num, out_endp_int int_val)
     {
         printf("out endp call\r\n");
@@ -615,7 +683,8 @@ void IN_endpoint_callback(endp_no num, in_endp_int int_val)
 
             case sts_phs_rx:
                 // code
-                printf("stsphs rx");
+                printf("status phase recieve");
+
                 break;
 
             case stup:
@@ -635,7 +704,8 @@ void IN_endpoint_callback(endp_no num, in_endp_int int_val)
 
             default:
                 break;
-            }
+            
+           }
         }
         else
         {
